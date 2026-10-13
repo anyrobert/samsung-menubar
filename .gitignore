@@ -1,0 +1,32 @@
+# Local builds and generated distributions
+.build/
+.swiftpm/
+dist/
+node_modules/
+.DS_Store
+__pycache__/
+*.pyc
+
+# Private investigation records and legacy tools are not part of the app.
+research/
+scripts/probe.mjs
+scripts/inventory.mjs
+scripts/report.py
+scripts/developer-diagnostics.py
+package.json
+package-lock.json
+
+# User configuration, pairing data, logs and recordings
+.env
+.local/
+.env.*
+!.env.example
+*.local.*
+*.log
+*.jsonl
+*.key
+*.pem
+*.p12
+*.mov
+*.mp4
+*.zip
