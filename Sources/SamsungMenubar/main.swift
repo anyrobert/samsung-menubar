@@ -119,6 +119,9 @@ if CommandLine.arguments.contains("--help") {
                    Run read-only TV diagnostics. A new TV needs explicit certificate
                    approval with --trust-new-tv and Allow on the TV.
                    Diagnostic reports contain local device information.
+    --launch <app-id> [--meta <text>] [--action DEEP_LINK|NATIVE_LAUNCH] [--host <tv-ip>] [--report <file>]
+                   Open an app on a paired TV, passing --meta to the app as its launch
+                   data. Uses the saved TV unless --host is given.
     """)
 } else if CommandLine.arguments.contains("--self-check") {
     Task { do { try await FeatureChecks.run(); exit(0) } catch { print("FAIL: \(error)"); exit(1) } }
@@ -159,6 +162,36 @@ if CommandLine.arguments.contains("--help") {
             let data = try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
             if let reportPath { try data.write(to: URL(fileURLWithPath: reportPath)) }
             say("DIAGNOSIS: \(apps.count) apps, on screen: \(visible.first ?? "none"), volume \(volume.map { String($0.volume) } ?? "unavailable").")
+            client.close(); exit(0)
+        } catch { say("ERROR: \(error.localizedDescription)"); client.close(); exit(1) }
+    }
+    RunLoop.main.run()
+} else if CommandLine.arguments.contains("--launch") {
+    Task { @MainActor in
+        func argument(_ flag: String) -> String? {
+            CommandLine.arguments.firstIndex(of: flag).flatMap { CommandLine.arguments.count > $0 + 1 ? CommandLine.arguments[$0 + 1] : nil }
+        }
+        let reportPath = argument("--report")
+        var lines: [String] = []
+        func say(_ line: String) {
+            print(line); fflush(stdout); lines.append(line)
+            if let reportPath { try? (lines.joined(separator: "\n") + "\n").write(toFile: reportPath + ".log", atomically: true, encoding: .utf8) }
+        }
+        guard let appID = argument("--launch"), SamsungProtocol.validAppID(appID) else { say("ERROR: use --launch <app-id>."); exit(2) }
+        let action = argument("--action")
+        guard action.map(["DEEP_LINK", "NATIVE_LAUNCH"].contains) ?? true else { say("ERROR: --action must be DEEP_LINK or NATIVE_LAUNCH."); exit(2) }
+        let host = argument("--host") ?? UserDefaults.standard.string(forKey: "tv.host") ?? ""
+        guard SamsungConnection.localHost(host) else { say("ERROR: no saved TV; pass --host <tv-ip>."); exit(2) }
+        let client = SamsungConnection(host: host)
+        client.onPairing = { say("PAIRING: choose Allow for Samsung-menubar on your TV.") }
+        do {
+            try await client.connect()
+            let installed = try await client.installedApps().first { $0.id == appID }
+            let app = installed ?? TVApp(id: appID, title: appID, type: 4, iconPath: "")
+            try await client.launch(app, metaTag: argument("--meta") ?? "", action: action)
+            try? await Task.sleep(nanoseconds: 5_000_000_000)
+            let visible = (try? await client.appVisible(appID)) == true
+            say("LAUNCHED: \(app.title) (type \(installed.map { String($0.type) } ?? "unknown")), on screen: \(visible ? "yes" : "no").")
             client.close(); exit(0)
         } catch { say("ERROR: \(error.localizedDescription)"); client.close(); exit(1) }
     }

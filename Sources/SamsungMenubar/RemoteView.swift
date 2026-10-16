@@ -80,6 +80,7 @@ struct RemoteView: View {
     @State private var settings = false
     @State private var search = ""
     @State private var text = ""
+    @State private var kickChannel = ""
     @State private var draftHost = ""
     @State private var draftName = ""
     @State private var draftMAC = ""
@@ -215,6 +216,7 @@ struct RemoteView: View {
                     }
                 }
             }
+            if let kick = store.kickApp { kickCard(kick) }
             sourcesCard
             if !store.mostUsedApps.isEmpty {
                 HStack(spacing: 8) {
@@ -228,6 +230,21 @@ struct RemoteView: View {
             }
         }
     }
+    private func kickCard(_ kick: TVApp) -> some View {
+        PanelCard {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 7) {
+                    AppMark(image: store.icons[kick.id], size: 18)
+                    Text("Kick channel").font(.system(size: 12, weight: .semibold))
+                }
+                HStack(spacing: 7) {
+                    TextField("Channel name or kick.com link", text: $kickChannel).textFieldStyle(.roundedBorder).onSubmit(openKickChannel)
+                    Button("Watch", action: openKickChannel).disabled(kickChannel.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }.disabled(!store.connected)
+        }
+    }
+    private func openKickChannel() { if store.openKickChannel(kickChannel) { kickChannel = "" } }
     private var sourcesCard: some View {
         PanelCard {
             VStack(alignment: .leading, spacing: 10) {

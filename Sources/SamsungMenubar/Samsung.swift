@@ -150,9 +150,10 @@ enum SamsungProtocol {
         if let data { params["data"] = data }
         return ["method": "ms.channel.emit", "params": params]
     }
-    static func launch(_ app: TVApp) -> [String: Any] {
+    static func launch(_ app: TVApp, metaTag: String = "", action: String? = nil) -> [String: Any] {
         // Web apps (type 2) open as deep links; native and system apps use a native launch.
-        emit("ed.apps.launch", data: ["appId": app.id, "action_type": app.type == 2 ? "DEEP_LINK" : "NATIVE_LAUNCH", "metaTag": ""])
+        // The app decides what metaTag means, such as a URL for the browser or a video ID for YouTube.
+        emit("ed.apps.launch", data: ["appId": app.id, "action_type": action ?? (app.type == 2 ? "DEEP_LINK" : "NATIVE_LAUNCH"), "metaTag": metaTag])
     }
     static func apps(from payload: [String: Any]) -> [TVApp] {
         let list = (payload["data"] as? [String: Any])?["data"] as? [[String: Any]] ?? []
@@ -166,6 +167,20 @@ enum SamsungProtocol {
     }
     static func validAppID(_ id: String) -> Bool {
         !id.isEmpty && id.count <= 128 && id.allSatisfy { $0.isLetter || $0.isNumber || $0 == "." || $0 == "_" || $0 == "-" }
+    }
+}
+
+/// The community Kick TV app (github.com/corekill/kick-tv-tizen). A build that reads launch data
+/// opens the kick.com channel URL passed as metaTag; other builds open their home screen.
+enum KickTV {
+    static let appID = "CrKckTV001.KickTV"
+    /// Accepts a channel name, @name or kick.com link and returns the channel URL.
+    static func channelURL(_ input: String) -> String? {
+        var name = input.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        for prefix in ["https://", "http://", "www.", "kick.com/", "@"] where name.hasPrefix(prefix) { name.removeFirst(prefix.count) }
+        name = String(name.prefix { $0 != "/" && $0 != "?" && $0 != "#" })
+        guard !name.isEmpty, name.count <= 64, name.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "_" || $0 == "-") }) else { return nil }
+        return "https://kick.com/" + name
     }
 }
 
@@ -332,9 +347,9 @@ private final class PingResult: @unchecked Sendable {
               let data = Data(base64Encoded: encoded), data.count <= 2_000_000 else { throw RemoteError.message("The TV sent no icon.") }
         return data
     }
-    func launch(_ app: TVApp) async throws {
+    func launch(_ app: TVApp, metaTag: String = "", action: String? = nil) async throws {
         onEvent?("Command", "ed.apps.launch")
-        try await send(SamsungProtocol.launch(app))
+        try await send(SamsungProtocol.launch(app, metaTag: metaTag, action: action))
     }
     private func rest(_ path: String, method: String = "GET") async throws -> [String: Any] {
         guard let url = URL(string: "https://\(host):\(SamsungProtocol.securePort)/api/v2/\(path)") else { throw RemoteError.message("Invalid TV address.") }

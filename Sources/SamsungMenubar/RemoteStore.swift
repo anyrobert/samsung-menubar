@@ -277,6 +277,15 @@ let otherSourceID = "tv.other"
         log("Launch app", app.title)
         perform { client in try await client.launch(app); try? await Task.sleep(nanoseconds: 1_500_000_000); await self.refreshForeground(client) }
     }
+    var kickApp: TVApp? { apps.first { $0.id == KickTV.appID } }
+    /// Returns false, leaving the field as typed, when the input is not a channel name or kick.com link.
+    func openKickChannel(_ input: String) -> Bool {
+        guard let app = kickApp else { return false }
+        guard let url = KickTV.channelURL(input) else { error = "Enter a Kick channel name or kick.com link."; return false }
+        log("Open Kick channel", url)
+        perform { client in try await client.launch(app, metaTag: url); try? await Task.sleep(nanoseconds: 1_500_000_000); await self.refreshForeground(client) }
+        return true
+    }
     func changeVolume(_ value: Double) {
         volume = min(100, max(0, value)); volumeTask?.cancel()
         volumeTask = Task {

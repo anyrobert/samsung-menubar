@@ -17,11 +17,12 @@ enum FeatureChecks {
         try testFreshConfigurationHasNoDeviceIdentityAndLoadsCustomParameters()
         try testChannelURLEncodesNameAndToken()
         try testRemoteMessagesMatchSamsungProtocol()
+        try testKickChannelURLAcceptsNamesAndLinksOnly()
         try testInstalledAppsParseAndRejectUnsafeIDs()
         try testSwipeEmitsOneArrowPerStepAlongDominantAxis()
         try testMACValidation()
         try testWakeTargetsSubnetBroadcast()
-        print("PASS: packaged image; usage persistence, midnight clipping, sleep exclusion; HTTP GET/HEAD/Range/404/416; XML escaping; RenderingControl values; local IPv4 boundaries, certificate trust, fresh configuration and custom parameters; channel URL, key, text and launch messages; installed-app parsing and app ID safety; swipe-to-arrow mapping; MAC validation; subnet broadcast for wake.")
+        print("PASS: packaged image; usage persistence, midnight clipping, sleep exclusion; HTTP GET/HEAD/Range/404/416; XML escaping; RenderingControl values; local IPv4 boundaries, certificate trust, fresh configuration and custom parameters; channel URL, key, text and launch messages; Kick channel links; installed-app parsing and app ID safety; swipe-to-arrow mapping; MAC validation; subnet broadcast for wake.")
     }
 
     static func testPackagedResourcesLoad() throws {
@@ -155,7 +156,17 @@ enum FeatureChecks {
         func action(_ message: [String: Any]) -> String? { ((message["params"] as? [String: Any])?["data"] as? [String: Any])?["action_type"] as? String }
         try equal(action(web), "DEEP_LINK"); try equal(action(native), "NATIVE_LAUNCH")
         try equal((web["params"] as? [String: Any])?["event"] as? String, "ed.apps.launch")
+        let browser = SamsungProtocol.launch(TVApp(id: "org.tizen.browser", title: "Internet", type: 4, iconPath: ""), metaTag: "https://example.com/a?b=1")
+        try equal(((browser["params"] as? [String: Any])?["data"] as? [String: Any])?["metaTag"] as? String, "https://example.com/a?b=1")
+        try equal(action(SamsungProtocol.launch(TVApp(id: "x.y", title: "X", type: 4, iconPath: ""), action: "DEEP_LINK")), "DEEP_LINK")
         try truth(JSONSerialization.isValidJSONObject(web) && JSONSerialization.isValidJSONObject(key))
+    }
+    static func testKickChannelURLAcceptsNamesAndLinksOnly() throws {
+        for input in ["xqc", " XQC ", "@xqc", "kick.com/xqc", "https://kick.com/xqc", "https://www.kick.com/@xqc/?ref=1"] {
+            try equal(KickTV.channelURL(input), "https://kick.com/xqc")
+        }
+        try equal(KickTV.channelURL("some_one-2"), "https://kick.com/some_one-2")
+        for unsafe in ["", "@", "https://kick.com/", "a b", "a&b=c", "café", "../x", String(repeating: "a", count: 65)] { try equal(KickTV.channelURL(unsafe), nil) }
     }
     static func testInstalledAppsParseAndRejectUnsafeIDs() throws {
         let payload: [String: Any] = ["event": "ed.installedApp.get", "data": ["data": [
