@@ -27,6 +27,8 @@ open "dist/Samsung-menubar.app"
 
 The build is signed locally and is not notarized. On first launch macOS asks to let the app find devices on your local network; choose **Allow**.
 
+By default the build is signed ad hoc, so macOS asks for your Keychain password again after every rebuild. To sign every build with the same identity, put a code signing identity from `security find-identity -v -p codesigning` in `.local/codesign-identity`, or set `CODESIGN_IDENTITY`. Choose **Always Allow** once and later builds keep access.
+
 ## Pair your TV
 
 1. Open Settings in the panel and choose **Find TVs on your network**, or enter the TV's IPv4 address.

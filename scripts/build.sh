@@ -38,7 +38,14 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>
 </dict></plist>
 PLIST
-codesign --force --deep --sign - --identifier br.local.SamsungRemote "$APP"
+# An ad-hoc signature changes with every build, so Keychain asks for the password
+# again after each rebuild. A stable identity, set in CODESIGN_IDENTITY or in the
+# ignored .local/codesign-identity file, keeps one "Always Allow" valid.
+IDENTITY="${CODESIGN_IDENTITY:-}"
+if [[ -z "$IDENTITY" && -s "$PROJECT_ROOT/.local/codesign-identity" ]]; then
+  IDENTITY="$(head -n 1 "$PROJECT_ROOT/.local/codesign-identity")"
+fi
+codesign --force --deep --sign "${IDENTITY:--}" --timestamp=none --identifier br.local.SamsungRemote "$APP"
 printf 'App created at %s\n' "$APP"
 # A rebuilt bundle gets a new signature, and macOS then cuts a running copy off the
 # local network. Restart it so the new build asks for permission once.
